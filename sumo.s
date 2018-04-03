@@ -3,6 +3,8 @@
 # r8 - Lego controller
 # r12 - PS 2 keyboard
 #r9 - HEX Display (HEX 0 -> 3)
+#r18 -> Score Count robot 1 
+#r19 -> Score count robot 2
 
 # r13, r14, r16, 17 - temp
 
@@ -67,9 +69,8 @@
 	.equ r_f_9, 0x7D
 
 	
-	###################################### INTERRUPT HANDLER ##################################
+###################################### INTERRUPT HANDLER ##################################
 	.section .exceptions, "ax"
-
 myISR:
 
 	#allocate space on stack
@@ -249,25 +250,52 @@ br RETURN
 		stwio	r13,	0(r8) #write the value
 		br RETURN
 
+#ROBOT IS OUT OF BOUNDS
 SENSOR_INTERRUPT:
-#STOP EVERYTHING NOW
-
-	STOP_MOTORS:
+#INCREMENT COUNTER AND DISPLAY ON HEX
 		ldwio r13, 0(r8)
 		srli r13, r13, 27
 		andi r13,r13,0x1
 		
-		#If senesor 0 was the reason then disable interupts forever
-		beq r13,r0, TURN_OFF
+		#If sensor 0 was the reason then increment counter for robot 2
+		beq r13,r0, INCREMENT_ROBOT_2_COUNTER
+
+		ldwio r13, 0(r8)
+		srli r13, r13, 28
+		andi r13,r13,0x1
+
+		#If sensor 1 was the reason then increment counter for robot 1
+		beq r13,r0, INCREMENT_ROBOT_1_COUNTER
+
 		br RETURN
 
-	TURN_OFF:
-		movia r13, 0b00000000000000000000000000000000  #DISABLE interrupts for sensor 0
-		stwio	r13,	8(r8)
-		
-		movia r13, MOTORS_STOP
-		stwio r13, 0(r8)
-		br RETURN
+INCREMENT_ROBOT_2_COUNTER:
+	addi r19,r19,1
+	br CHECK_ENDGAME
+
+INCREMENT_ROBOT_1_COUNTER:
+	addi r18,r18,1	
+
+br CHECK_ENDGAME
+
+
+CHECK_ENDGAME:
+	#Stop the motors
+	movia r13, MOTORS_STOP
+	stwio r13, 0(r8)
+
+	#Update score for robot 2
+	mov r4,r19
+	movi r5,1
+	call display_hex_number
+
+	#Update score for robot 1
+	mov r4,r18
+	movi r5,0
+	call display_hex_number
+
+	br RETURN
+
 
 JTAG_INTERRUPT:
 #Read some information now
