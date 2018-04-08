@@ -5,11 +5,9 @@
 #  r9 - HEX Display (HEX 0 -> 3)
 #  r18 -> Score Count robot 1
 #  r19 -> Score count robot 2
-#  r20 -> Timer count
-#  r21 -> boolean for the game mode;  0 - wait, 1 - play
-#  r22 -> end game flag; 1 - game, 0 - end game
+
 #  r13, r14, r15, r16, r17 - temp
-.section .text
+
 .global	_start
 
 	.equ PS_2_KEYBOARD, 0xFF200100
@@ -46,7 +44,7 @@
 	.equ  TIMER0_PERIODH,   12
 	.equ  TIMER0_SNAPL,     16
 	.equ  TIMER0_SNAPH,     20
-	.equ  TICKSPERSEC,      100000000
+	.equ  TICKSPERSEC,      5000000
 
 	.equ RED_LEDS, 0xFF200000 	   #  (From DESL website > NIOS II > devices)
 
@@ -73,355 +71,6 @@
 	.equ f_8, 0x75
 	.equ r_f_9, 0x7D
 
-
-####################################################### MAIN CODE ####################################################
-
-	_start:
-
-		#define game mode
-		movi r21, 0
-		movi r22, 1
-
-		# Initialize stack pointer
-		movia sp, 0x03FFFFFC
-
-		# set up JTAG keyboard and timer
-		movia r10, JTAG
-		movia r11, TIMER
-
-		# Load HEX Address
-		movia r9, HEX
-
-		# set up PS 2 keyboard
-		movia r12, PS_2_KEYBOARD
-
-		# set up LEDs
-		#movi r17, 0x1
-		#movia  r16, RED_LEDS          #  r16 and r17 are temporary values
-		# stwio  r17, 0(r16)
-
-		# Set up direction register
-		movia	r8,	ADDR_JP1
-		movia	r13,	0x07f557ff		# set direction for motors and sensors to output and sensor data registers to inputs
-		stwio	r13,	4(r8)
-
-		first:
-		movia	r13,	LOAD_SENSOR0_THRESHOLD # Load the threshhold on sensor0
-		stwio	r13,	0(r8) # write the value
-		movia	r13,	LOAD_SENSOR0_THRESHOLD # Load the threshhold on sensor0
-		stwio	r13,	0(r8) # write the value
-		movia	r13,	MOTORS_STOP # Hex code for setting motors in forward direction with sensor 0 on
-		stwio	r13,	0(r8) # write the value
-
-
-		movia	r13,	LOAD_SENSOR1_THRESHOLD # Load the threshhold on sensor1
-		stwio	r13,	0(r8) # write the value
-		movia	r13,	LOAD_SENSOR1_THRESHOLD # Load the threshhold on sensor1
-		stwio	r13,	0(r8) # write the value
-		movia	r13,	MOTORS_STOP # Hex code for setting motors in forward direction with sensor 0 on
-		stwio	r13,	0(r8) # write the value
-
-		#  Enable all interrupts (processor and user controlled)
-		call enable_all_interrupts
-
-		call reset_game
-
-	SETUP_TIMER:
-
-		addi  r9, r0, 0x8                   #  stop the counter
-		stwio r9, TIMER0_CONTROL(r11)
-
-		# Set up the period registers
-		addi  r9, r0, %lo (TICKSPERSEC)
-		stwio r9, TIMER0_PERIODL(r11)
-		addi  r9, r0, %hi(TICKSPERSEC)
-		stwio r9, TIMER0_PERIODH(r11)
-
-		# Reset the timer device
-		stwio r0, TIMER0_STATUS(r11)
-
-		# Start the timer with proper configuration
-		addi  r9, r0, 0x5                   #  0x4 = 0101 so we write 1 to START but not to continue
-		stwio r9, TIMER0_CONTROL(r11)
-
-	LOOPBOOP:
-		br LOOPBOOP
-
-#######################################################  FUNCTIONS #####################################################
-
-	# Function responsible for displaying a number on the appropriate hex display
-	# R4 contains the value of the number to be displayed
-	# R5 contains the hex display to draw on
-	display_hex_number:
-
-		# allocate space on the stack
-		subi sp,sp,20
-
-		# Save registers
-		stw r13, 0(sp)
-		stw r14, 4(sp)
-		stw r15, 8(sp)
-		stw r16, 12(sp)
-		stw ra, 16(sp)
-
-		# Load HEX Address
-		movia r9, HEX
-
-		# determine shift for hex value
-		muli r16,r5,7
-		add r16, r16, r5
-
-		# Switch statement implementation to determine binary of hex number to be drawn
-		case0:
-			cmpeqi r15, r4, 0
-			beq r15,r0,case1
-			movia r14, HEX_ZERO
-			br break_switch
-
-		case1:
-			cmpeqi r15, r4, 1
-			beq r15,r0,case2
-			movia r14, HEX_ONE
-			br break_switch
-
-		case2:
-			cmpeqi r15, r4, 2
-			beq r15,r0,case3
-			movia r14, HEX_TWO
-			br break_switch
-
-		case3:
-			cmpeqi r15, r4, 3
-			beq r15,r0,case4
-			movia r14, HEX_THREE
-			br break_switch
-
-		case4:
-			cmpeqi r15, r4, 4
-			beq r15,r0,case5
-			movia r14, HEX_FOUR
-			br break_switch
-
-		case5:
-			cmpeqi r15, r4, 5
-			beq r15,r0,case6
-			movia r14, HEX_FIVE
-			br break_switch
-
-		case6:
-			cmpeqi r15, r4, 6
-			beq r15,r0,case7
-			movia r14, HEX_SIX
-			br break_switch
-
-		case7:
-			cmpeqi r15, r4, 7
-			beq r15,r0,case8
-			movia r14, HEX_SEVEN
-			br break_switch
-
-		case8:
-			cmpeqi r15, r4, 8
-			beq r15,r0,case9
-			movia r14, HEX_EIGHT
-			br break_switch
-
-		case9:
-			cmpeqi r15, r4, 9
-			beq r15,r0,break_switch
-			movia r14, HEX_NINE
-			br break_switch
-
-
-		break_switch:
-		# Load the current status
-		ldwio r13, 0(r9)
-
-		# Shift the binary number to the appropriate location
-		sll r14,r14,r16
-
-		# Get the zeroes in the right position
-		movi r15, 0xFFFFFF80
-		rol r15, r15, r16
-
-		# Update the HEX Display Properly
-		and r13,r13,r15
-		or r13,r13,r14
-
-		# Display the new value on the hex display
-		stwio r13, 0(r9)
-
-		# Restore the registers from stack
-		ldw r13, 0(sp)
-		ldw r14, 4(sp)
-		ldw r15, 8(sp)
-		ldw r16, 12(sp)
-		ldw ra, 16(sp)
-
-		# Deallocate memory from stack
-		addi sp,sp,20
-	ret
-
-
-	# Function that runs when someone wins, turns off interrupts and resets variables
-	# Useful when someone has won or hard reset the game
-	reset_game:
-
-		#  allocate space on stack
-		subi sp,sp,4
-
-		#  Store registers modified
-		stw ra,0(sp)
-
-	# Reset Counters
-		movi r18, 0
-		movi r19, 0
-		movi r20, 0
-
-	# Set up hex with 0 value
-		movi r4,0
-		movi r5,2
-		call display_hex_number
-
-		movi r5,3
-		call display_hex_number
-
-		movia r5,0
-		call display_hex_number
-
-		movia r5,1
-		call display_hex_number
-
-	# Disable movement and scoreboard until game start enabled - set flag to 0
-		movi r21, 0
-
-		movi r22, 1
-
-		movia r2,RED_LEDS
-  		movi  r3,0x00
- 		stwio r3,0(r2)
-
-		ldw ra,0(sp)
-
-		# deallocate space on stack
-		addi sp,sp,4
-	ret
-
-
-	# Function that pauses game temporarily, useful for when robot gets knocked out
-	# Key0 and Key4 starts a round ie devices start working again
-	temp_halt_game:
-
-				#  allocate space on stack
-		subi sp,sp,4
-
-		#  Store registers modified
-		stw ra,0(sp)
-
-	# Disable movement and scoreboard until game start enabled - set flag to 0
-		movi r21, 0
-
-		ldw ra,0(sp)
-
-		# deallocate space on stack
-		addi sp,sp,4
-	ret
-
-	# Function that resumes user input and starts the game
-	resume_game:
-		#  allocate space on stack
-		subi sp,sp,4
-
-		#  Store registers modified
-		stw ra,0(sp)
-
-		# set flag to 1
-		movi r21, 1
-
-		movia	r13,	MOTORS_STOP # Hex code for setting motors in forward direction with sensor 0 on
-		stwio	r13,	0(r8) # write the value
-
-		ldw ra,0(sp)
-
-		# deallocate space on stack
-		addi sp,sp,4
-	ret
-
-	# Function to enable all interrupts
-	enable_all_interrupts:
-
-				#  allocate space on stack
-		subi sp,sp,4
-
-		#  Store registers modified
-		stw ra,0(sp)
-
-		# enable interrupts in JTAG device
-		movi r13, 0x00000001
-		stwio r13, 4(r10)
-
-		# enable interrupts on Lego device
-		movia r13, 0b00011000000000000000000000000000  # enable interrupts for sensor 0 and sensor 1
-		stwio	r13,	8(r8)
-
-		# enable interrupts on PS2 keyboard device
-		movia r13, 0b01
-		stwio	r13,	4(r12)
-
-		#  Enable interrupts for Keys
-		movia r13, KEY
-		# Enable interrupts for key 0,1,3
-		movi r14, 0b01011
-		stwio r14, 8(r13)
-		movi r14, 0b1111
-		stwio r14, 12(r13)
-
-		#  Mask IRQ line bits for processor TIMER IS BIT 0 and Lego controller (JP2) is bit 12, keyboard bit 7, JTAG UART is bit 8, KEY -> bit 1
-	    movi r13, 0b01000110000011 #  timer currently disabled
-	    wrctl ienable, r13
-
-	    #  Enable global interrupts for processor
-	    movi r13, 0x0000001
-	    wrctl status, r13
-
-		ldw ra,0(sp)
-
-		# deallocate space on stack
-		addi sp,sp,4
-	ret
-
-
-	#  Function to disable interrupts from device
-	#  Useful for disable user control temporarily
-	disable_device_interrupts:
-
-		#  allocate space on stack
-		subi sp,sp,4
-
-		#  Store registers modified
-		stw ra,0(sp)
-
-		#  disable interrupts in JTAG device
-		movi r13, 0x00000000
-		stwio r13, 4(r10)
-
-		#stop the timer
-		movi r15, 0b01000
-		stwio r15, 4(r11)
-
-		#  disable interrupts on Lego device
-		movia r13, 0b00000000000000000000000000000000  # disable interrupts for all sensors
-		stwio	r13,	8(r8)
-
-		#  disable interrupts on PS2 keyboard device
-		movia r13, 0b00
-		stwio	r13,	4(r12)
-
-		ldw ra,0(sp)
-
-		# deallocate space on stack
-		addi sp,sp,4
-	ret
 
 #########################################################  INTERRUPT HANDLER ###########################################
 		.section .exceptions, "ax"
@@ -475,10 +124,10 @@
 
 		# Load the key status into r14
 		movia r15, KEY
-		ldwio r14, 12(r15)
+		ldwio r14, 0(r15)
 
 		# If key0 and Key3 are pressed then start a new round
-		movi r13, 0b0001
+		movi r13, 0b1001
 		beq r13,r14,START_ROUND
 
 		# If Key1 is pressed then start a new game
@@ -489,7 +138,6 @@
 		br ACKNOWLEDGE
 
 		START_ROUND:
-			beq r22, r0, ACKNOWLEDGE
 			call resume_game
 			br ACKNOWLEDGE
 
@@ -498,11 +146,9 @@
 
 		# Acknowledge interrupt and return
 		ACKNOWLEDGE:
-			movi r13, 0b1111
+			movi r13, 0x1
 			stwio r13, 12(r15)
-
-		movi r20, 0
-		br RESET_TIMER
+			br RETURN
 
 
 
@@ -510,8 +156,6 @@
 
 	ldwio r23, 0(r12)
 	andi r23, r23, 0b011111111
-
-	beq r21, r0, RETURN
 
 	movia r13, b_2
 	beq r23, r13, BACK_robot2
@@ -650,9 +294,6 @@
 	# ROBOT IS OUT OF BOUNDS
 	SENSOR_INTERRUPT:
 	# INCREMENT COUNTER AND DISPLAY ON HEX
-
-	beq r21, r0, ACKNOWLEDGE_SENSORS
-
 			ldwio r13, 0(r8)
 			srli r13, r13, 27
 			andi r13,r13,0x1
@@ -668,7 +309,6 @@
 			beq r13,r0, INCREMENT_ROBOT_1_COUNTER
 
 			# Acknowledge the interrupt
-	ACKNOWLEDGE_SENSORS:
 			movia r13, 0xFFFFFFFF
 			stwio r13, 12(r8)
 
@@ -683,14 +323,6 @@
 
 
 			CHECK_ENDGAME:
-
-			movi r20, 0
-			mov r4,r20
-			movi r5,2
-			call display_hex_number
-			movi r5,3
-			call display_hex_number
-
 				# Stop the motors
 				movia r13, MOTORS_STOP
 				stwio r13, 0(r8)
@@ -711,28 +343,14 @@
 				# Acknowledge the interrupt
 				movia r13, 0xFFFFFFFF
 				stwio r13, 12(r8)
-			movi r16, 0b011
-			beq r19, r16, END_GAME
-			beq r18, r16, END_GAME
 
 				br RETURN
-
-	END_GAME:
-		movi r22, 0
-		movia r2,	RED_LEDS
-  		movi  r3,0x3ff
- 		stwio r3,0(r2)
-	br RETURN
-
 
 
 	JTAG_INTERRUPT:
 	# Read some information now
-
 	movia r10, JTAG
 	ldwio r23, 0(r10)
-
-	beq r21, r0, RETURN
 
 	# Get the ls 7 bits (data)
 	andi r23, r23, 0b011111111
@@ -871,65 +489,7 @@
 			stwio	r13,	0(r8) # write the value
 			br RETURN
 
-TIMER_INTERRUPT:
-
-		beq r21, r0, RESET_TIMER
-
-		addi r20, r20, 1
-		movi r16, 0b1001
-		movi r14, 0
-		mov r13, r20
-
-		ble r13, r16, write_values_to_hex #write if less than 10
-
-		addi r14, r14, 1
-		subi r13, r13, 0b1010
-
-		ble r13, r16, write_values_to_hex #write if less than 20
-
-		addi r14, r14, 1
-		subi r13, r13, 0b1010
-
-		ble r13, r16, write_values_to_hex #write if less than 30
-
-		addi r14, r14, 1
-		subi r13, r13, 0b1010
-
-		ble r13, r16, write_values_to_hex #write if less than 40
-
-		addi r14, r14, 1
-		subi r13, r13, 0b1010
-
-		ble r13, r16, write_values_to_hex #write if less than 50
-
-		addi r14, r14, 1
-		subi r13, r13, 0b1010
-
-		ble r13, r16, write_values_to_hex #write if less than 60
-
-		movi r20, 0
-		movi r14, 0
-		movi r13, 0
-
-		# disable user inputs
-		call temp_halt_game
-
-write_values_to_hex:
-
-		mov r4,r13
-		movi r5,2
-		call display_hex_number
-
-		mov r4,r14
-		movi r5,3
-		call display_hex_number
-
-	RESET_TIMER:
-		# Reset the timer device
-		stwio r0, TIMER0_STATUS(r11)
-		#Start the timer with proper configuration
-		addi  r13, r0, 0x5                   # 0x4 = 0101 so we write 1 to START but not to continue
-		stwio r13, TIMER0_CONTROL(r11)
+	TIMER_INTERRUPT:
 
 	RETURN:
 
@@ -945,3 +505,271 @@ write_values_to_hex:
 
 	subi ea,ea,4
 	eret
+
+####################################################### MAIN CODE ####################################################
+
+	_start:
+
+		# Initialize stack pointer
+		movia sp, 0x03FFFFFC
+
+		# set up JTAG keyboard and timer
+		movia r10, JTAG
+		movia r11, TIMER
+
+		# Load HEX Address
+		movia r9, HEX
+
+		# set up PS 2 keyboard
+		movia r12, PS_2_KEYBOARD
+
+		# set up LEDs
+		movi r17, 0x1
+		movia  r16, RED_LEDS          #  r16 and r17 are temporary values
+		# stwio  r17, 0(r16)
+
+		# Set up direction register
+		movia	r8,	ADDR_JP1
+		movia	r13,	0x07f557ff		# set direction for motors and sensors to output and sensor data registers to inputs
+		stwio	r13,	4(r8)
+
+		first:
+		movia	r13,	LOAD_SENSOR0_THRESHOLD # Load the threshhold on sensor0
+		stwio	r13,	0(r8) # write the value
+		movia	r13,	LOAD_SENSOR0_THRESHOLD # Load the threshhold on sensor0
+		stwio	r13,	0(r8) # write the value
+		movia	r13,	MOTORS_STOP # Hex code for setting motors in forward direction with sensor 0 on
+		stwio	r13,	0(r8) # write the value
+
+
+		movia	r13,	LOAD_SENSOR1_THRESHOLD # Load the threshhold on sensor1
+		stwio	r13,	0(r8) # write the value
+		movia	r13,	LOAD_SENSOR1_THRESHOLD # Load the threshhold on sensor1
+		stwio	r13,	0(r8) # write the value
+		movia	r13,	MOTORS_STOP # Hex code for setting motors in forward direction with sensor 0 on
+		stwio	r13,	0(r8) # write the value
+
+		# Set up hex with 0 value
+		movia r4, 0
+		movia r5,0
+		call display_hex_number
+
+		movia r5,1
+		call display_hex_number
+
+		#  Enable all interrupts (processor and user controlled)
+		call enable_all_interrupts
+
+	SETUP_TIMER:
+
+		addi  r9, r0, 0x8                   #  stop the counter
+		stwio r9, TIMER0_CONTROL(r11)
+
+		# Set up the period registers
+		addi  r9, r0, %lo (TICKSPERSEC)
+		stwio r9, TIMER0_PERIODL(r11)
+		addi  r9, r0, %hi(TICKSPERSEC)
+		stwio r9, TIMER0_PERIODH(r11)
+
+		# Reset the timer device
+		stwio r0, TIMER0_STATUS(r11)
+
+		# Start the timer with proper configuration
+		addi  r9, r0, 0x5                   #  0x4 = 0101 so we write 1 to START but not to continue
+		stwio r9, TIMER0_CONTROL(r11)
+
+	LOOPBOOP:
+		br LOOPBOOP
+
+#######################################################  FUNCTIONS #####################################################
+
+	# Function responsible for displaying a number on the appropriate hex display
+	# R4 contains the value of the number to be displayed
+	# R5 contains the hex display to draw on
+	display_hex_number:
+
+		# allocate space on the stack
+		subi sp,sp,16
+
+		# Save registers
+		stw r13, 0(sp)
+		stw r14, 4(sp)
+		stw r15, 8(sp)
+		stw r16, 12(sp)
+
+		# Load HEX Address
+		movia r9, HEX
+
+		# determine shift for hex value
+		muli r16,r5,7
+		add r16, r16, r5
+
+		# Switch statement implementation to determine binary of hex number to be drawn
+		case0:
+			cmpeqi r15, r4, 0
+			beq r15,r0,case1
+			movia r14, HEX_ZERO
+			br break_switch
+
+		case1:
+			cmpeqi r15, r4, 1
+			beq r15,r0,case2
+			movia r14, HEX_ONE
+			br break_switch
+
+		case2:
+			cmpeqi r15, r4, 2
+			beq r15,r0,case3
+			movia r14, HEX_TWO
+			br break_switch
+
+		case3:
+			cmpeqi r15, r4, 3
+			beq r15,r0,case4
+			movia r14, HEX_THREE
+			br break_switch
+
+		case4:
+			cmpeqi r15, r4, 4
+			beq r15,r0,case5
+			movia r14, HEX_FOUR
+			br break_switch
+
+		case5:
+			cmpeqi r15, r4, 5
+			beq r15,r0,case6
+			movia r14, HEX_FIVE
+			br break_switch
+
+		case6:
+			cmpeqi r15, r4, 6
+			beq r15,r0,case7
+			movia r14, HEX_SIX
+			br break_switch
+
+		case7:
+			cmpeqi r15, r4, 7
+			beq r15,r0,case8
+			movia r14, HEX_SEVEN
+			br break_switch
+
+		case8:
+			cmpeqi r15, r4, 8
+			beq r15,r0,case9
+			movia r14, HEX_EIGHT
+			br break_switch
+
+		case9:
+			cmpeqi r15, r4, 0
+			beq r15,r0,break_switch
+			movia r14, HEX_NINE
+			br break_switch
+
+
+		break_switch:
+		# Load the current status
+		ldwio r13, 0(r9)
+
+		# Shift the binary number to the appropriate location
+		sll r14,r14,r16
+
+		# Get the zeroes in the right position
+		movi r15, 0xFFFFFF80
+		rol r15, r15, r16
+
+		# Update the HEX Display Properly
+		and r13,r13,r15
+		or r13,r13,r14
+
+		# Display the new value on the hex display
+		stwio r13, 0(r9)
+
+		# Restore the registers from stack
+		ldw r13, 0(sp)
+		ldw r14, 4(sp)
+		ldw r15, 8(sp)
+		ldw r16, 12(sp)
+
+		# Deallocate memory from stack
+		addi sp,sp,16
+	ret
+
+
+	# Function that runs when someone wins, turns off interrupts and resets variables
+	# Useful when someone has won or hard reset the game
+	reset_game:
+	# Reset Counters
+	movi r18, 0
+	movi r19, 0
+
+	# Reset HEX Displays
+	# Set up hex with 0 value
+		movia r4, 0
+		movia r5,0
+		call display_hex_number
+
+		movia r5,1
+		call display_hex_number
+
+	# Disable movement and scoreboard until game start enabled
+	call disable_device_interrupts
+	ret
+
+
+	# Function that pauses game temporarily, useful for when robot gets knocked out
+	# Key0 and Key4 starts a round ie devices start working again
+	temp_halt_game:
+		call disable_device_interrupts
+	ret
+
+	# Function that resumes user input and starts the game
+	resume_game:
+		call enable_all_interrupts
+	ret
+
+	# Function to enable all interrupts
+	enable_all_interrupts:
+		# enable interrupts in JTAG device
+		movi r13, 0x00000001
+		stwio r13, 4(r10)
+
+		# enable interrupts on Lego device
+		movia r13, 0b00011000000000000000000000000000  # enable interrupts for sensor 0 and sensor 1
+		stwio	r13,	8(r8)
+
+		# enable interrupts on PS2 keyboard device
+		movia r13, 0b01
+		stwio	r13,	4(r12)
+
+		#  Enable interrupts for Keys
+		movia r13, KEY
+		# Enable interrupts for key 0,1,3
+		movi r14, 0b01011
+		stwio r14, 8(r13)
+
+		#  Mask IRQ line bits for processor TIMER IS BIT 0 and Lego controller (JP2) is bit 12, keyboard bit 7, JTAG UART is bit 8, KEY -> bit 1
+	    movi r13, 0b01000110000010 #  timer currently disabled
+	    wrctl ienable, r13
+
+	    #  Enable global interrupts for processor
+	    movi r13, 0x0000001
+	    wrctl status, r13
+	ret
+
+
+	#  Function to disable interrupts from device
+	#  Useful for disable user control temporarily
+	disable_device_interrupts:
+
+		#  enable interrupts in JTAG device
+		movi r13, 0x00000000
+		stwio r13, 4(r10)
+
+		#  enable interrupts on Lego device
+		movia r13, 0b00000000000000000000000000000000  # disable interrupts for all sensors
+		stwio	r13,	8(r8)
+
+		#  disable interrupts on PS2 keyboard device
+		movia r13, 0b00
+		stwio	r13,	4(r12)
+	ret
